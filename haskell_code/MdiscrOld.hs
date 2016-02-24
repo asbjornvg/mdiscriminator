@@ -1,4 +1,4 @@
-module Mdiscr
+module MdiscrOld
     (
      mdiscr
     ) where

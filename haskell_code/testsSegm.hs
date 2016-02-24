@@ -1,4 +1,4 @@
-import Mdiscriminator(segmMdiscr)
+import MdiscrSegmented(segmMdiscr)
 
 arr :: [Int]
 arr = [5,4,2,3,7,8,6,4,1,9,11,12,10]

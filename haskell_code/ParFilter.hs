@@ -1,4 +1,4 @@
-module Parfilter
+module ParFilter
     (
      parFilter
     ) where

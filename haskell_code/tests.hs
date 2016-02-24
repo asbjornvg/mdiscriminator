@@ -1,14 +1,5 @@
-import Mdiscriminator(mdiscr4, mdiscr)
-
--- main :: IO ()
--- main = do
---   let arr = [5,4,2,3,7,8,6,4,1,9,11,12,10]
---       discr4 x = x `mod` 4
---   putStrLn . show $ mdiscr4 discr4 arr
---   let discr3 x = x `mod` 3
---   putStrLn . show $ mdiscr4 discr3 arr
---   let discr2 x = x `mod` 2
---   putStrLn . show $ mdiscr4 discr2 arr
+import Mdiscr(mdiscr)
+import Mdiscr4(mdiscr4)
 
 arr :: [Int]
 arr = [5,4,2,3,7,8,6,4,1,9,11,12,10]
