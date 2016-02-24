@@ -4,30 +4,17 @@ MdiscrTest: MdiscrTest.cu
 clean:
 	rm MdiscrTest
 
+
+# For synchronizing between my computer and the gpu01 machine.
+
 get:
 	rsync -avu --exclude 'a.out' --exclude '*~' gpu01:mdiscr/ .
 
 get_dry:
 	rsync -navu --exclude 'a.out' --exclude '*~' gpu01:mdiscr/ .
 
-# put:
-# 	rsync -avu --exclude 'a.out' --exclude '*~' ./ gpu01:mdiscr
-
-# put_dry:
-# 	rsync -navu --exclude 'a.out' --exclude '*~' ./ gpu01:mdiscr
-
-# sync: get put
-
-# get_delete:
-# 	rsync -avu --delete --exclude 'a.out' --exclude '*~' gpu01:mdiscr/ .
-
-# get_delete_dry:
-# 	rsync -navu --delete --exclude 'a.out' --exclude '*~' gpu01:mdiscr/ .
-
 put_delete:
 	rsync -avu --delete --exclude 'a.out' --exclude '*~' ./ gpu01:mdiscr
-
-# sync_delete: get_delete put_delete
 
 put_delete_dry:
 	rsync -navu --delete --exclude 'a.out' --exclude '*~' ./ gpu01:mdiscr
