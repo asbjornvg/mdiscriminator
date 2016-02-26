@@ -8,6 +8,7 @@ int testMdiscr(  const unsigned int num_elems
     
     unsigned int mem_size = num_elems * sizeof(typename ModN::InType);
     
+    // Allocate memory.
     typename ModN::InType* h_in    = (typename ModN::InType*) malloc(mem_size);
     typename ModN::InType* h_out   = (typename ModN::InType*) malloc(mem_size);
     
@@ -22,44 +23,46 @@ int testMdiscr(  const unsigned int num_elems
         }
     }
     
-    // int data[6] = {1, 0, 2, 2, 1, 3};
-    // thrust::inclusive_scan(data, data + 6, data);
-    
-    // for(unsigned int i = 0; i < num_elems; i++) {
-    //     printf("h_in[%d] = %d\n", i, h_in[i]);
-    // }
-    for(unsigned int i = 0; i < 11; i++) {
-        printf("h_in[%d] = %d\n", i, h_in[i]);
-    }
-    printf("...\n");
+    /* for(unsigned int i = 0; i < num_elems; i++) { */
+    /*     printf("h_in[%d] = %d\n", i, h_in[i]); */
+    /* } */
+    /* for(unsigned int i = 0; i < 11; i++) { */
+    /*     printf("h_in[%d] = %d\n", i, h_in[i]); */
+    /* } */
+    /* printf("...\n"); */
     
     typename ModN::InType *d_in, *d_out;
-    { // device allocation and copyin
+    { // Device allocation.
         cudaMalloc((void**)&d_in ,   mem_size);
         cudaMalloc((void**)&d_out,   mem_size);
         
-        // copy host memory to device
+        // Copy host memory to device.
         cudaMemcpy(d_in, h_in, mem_size, cudaMemcpyHostToDevice);
         cudaThreadSynchronize();
     }
     
+    // Call the discriminator function.
     typename ModN::TupleType sizes = mdiscr<Mod4>( num_elems, d_in, d_out );
+    
+    // Copy result back to host.
     cudaMemcpy(h_out, d_out, mem_size, cudaMemcpyDeviceToHost);
     cudaThreadSynchronize();
+    
+    // Free device memory.
     cudaFree(d_in );
     cudaFree(d_out);
         
-    // for(unsigned int i = 0; i < num_elems; i++) {
-    //     printf("h_out[%d] = %d\n", i, h_out[i]);
-    // }
-    for(unsigned int i = 0; i < 11; i++) {
-        printf("h_out[%d] = %d\n", i, h_out[i]);
-    }
-    printf("...\n");
+    /* for(unsigned int i = 0; i < num_elems; i++) { */
+    /*     printf("h_out[%d] = %d\n", i, h_out[i]); */
+    /* } */
+    /* for(unsigned int i = 0; i < 11; i++) { */
+    /*     printf("h_out[%d] = %d\n", i, h_out[i]); */
+    /* } */
+    /* printf("...\n"); */
     
-    for(int k = 0; k < ModN::TupleType::cardinal; k++) {
-        printf("sizes[%d] = %d\n", k, sizes[k]);
-    }
+    /* for(int k = 0; k < ModN::TupleType::cardinal; k++) { */
+    /*     printf("sizes[%d] = %d\n", k, sizes[k]); */
+    /* } */
         
     /*************
      * Validation
@@ -116,7 +119,7 @@ int testMdiscr(  const unsigned int num_elems
         printf("mdiscr on %d elems: INVALID RESULT!\n", num_elems);
     }
     
-    // cleanup memory
+    // Cleanup memory.
     free(h_in );
     free(h_out);
 
@@ -126,7 +129,7 @@ int testMdiscr(  const unsigned int num_elems
 
 int main(int argc, char** argv) {
     
-    const unsigned int num_elems = 503320; //50332001;
+    const unsigned int num_elems = 40000000; //50332001;
     
     return testMdiscr<Mod4>(num_elems);
 }

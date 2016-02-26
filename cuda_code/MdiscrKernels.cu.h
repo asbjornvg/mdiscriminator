@@ -72,17 +72,17 @@ public:
 
 /*
  * Kernel that applies the conditition given by the "apply" operation of the
- * COND template parameter class to each element of the input.
+ * DISCR template parameter class to each element of the input.
  */
-template<class COND>
+template<class DISCR>
 __global__ void
-mapCondKernel(   typename COND::InType*    d_in,
+mapCondKernel(   typename DISCR::InType*    d_in,
                  int*                      d_out,
                  unsigned int              d_size
     ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     if(gid < d_size) {
-        d_out[gid] = COND::apply(d_in[gid]);
+        d_out[gid] = DISCR::apply(d_in[gid]);
     }
 }
 
@@ -90,16 +90,16 @@ mapCondKernel(   typename COND::InType*    d_in,
  * Kernel that turns all the elements into tuples. An element with value k
  * is turned into a tuple of all zeros with a 1 in the k'th position.
 */
-template<class COND>
+template<class DISCR>
 __global__ void
 mapTupleKernel(  int*                       d_in,
-                 typename COND::TupleType*  d_out,
+                 typename DISCR::TupleType*  d_out,
                  unsigned int               d_size
     ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     if(gid < d_size) {
         // New tuple of zeros.
-        typename COND::TupleType tuple;
+        typename DISCR::TupleType tuple;
         // Set the entry to 1 that corresponds to the class.
         tuple[d_in[gid]] = 1;
         d_out[gid] = tuple;
@@ -107,37 +107,28 @@ mapTupleKernel(  int*                       d_in,
 }
 
 /*
- * Kernel that adds the given element to each element of the array.
+ * Kernel that extracts the appropriate entry from the scanned columns and adds
+ * the corresponding offset.
 */
-template<class OP, class T>
+template<class DISCR>
 __global__ void
-mapAddKernel(  T*            d_in,
-               T*            d_out,
-               T             addition,
-               unsigned int  d_size
+zipWithKernel(  int*                       d_classes,
+                typename DISCR::TupleType*  d_scan_results,
+                typename DISCR::TupleType   offsets,
+                int*                       d_out,
+                unsigned int               d_size
     ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     if(gid < d_size) {
-        d_out[gid] = OP::apply(d_in[gid], addition);
-    }
-}
-
-/*
- * Kernel that uses the first input array to extract values from the second
- * input array (that consists of tuples). So if the first array contains an i,
- * the i'th entry of the tuple is extracted from the second array. We also
- * subtract 1 to make it 0 indexed.
-*/
-template<class COND>
-__global__ void
-zipWithExtractKernel(  int*                       d_in1,
-                       typename COND::TupleType*  d_in2,
-                       int*                       d_out,
-                       unsigned int               d_size
-    ) {
-    const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
-    if(gid < d_size) {
-        d_out[gid] = d_in2[gid][d_in1[gid]] - 1;
+        // The current entries.
+        int k = d_classes[gid];
+        typename DISCR::TupleType scan_result = d_scan_results[gid];
+        
+        // Select the k'th entries.
+        int scan_result_k = scan_result[k];
+        int offset_k = offsets[k];
+        // Add offset. Subtract 1 to make it 0-indexed.
+        d_out[gid] = scan_result_k + offset_k - 1;
     }
 }
 
