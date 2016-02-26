@@ -6,8 +6,8 @@ module MdiscrOld
 import Helpers
 
 -- Generalized version.
-mdiscr :: Int -> (a -> Int) -> [a] -> ([a], [Int])
-mdiscr m discr arr = (permute inds arr, flags)
+mdiscr :: Int -> (a -> Int) -> [a] -> ([Int], [a])
+mdiscr m discr arr = (flags, permute inds arr)
     where
       -- The length of the input array.
       n = length arr

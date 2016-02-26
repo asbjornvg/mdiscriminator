@@ -10,6 +10,7 @@ module Helpers
     ,segmScanExc
     ,permute
     ,write
+    ,createColumn
     ) where
 
 import Data.List(sortBy)
@@ -57,16 +58,6 @@ segmScanExc myop ne flags arr =
                          inds flags
     in  segmScanInc myop ne flags adj_arr
 
--- -- No starting element.
--- segmScanInc1 :: (a -> a -> a) -> [Int] -> [a] -> [a]
--- segmScanInc1 myop flags arr =
---     tail $
---          scanl (\v1 (f,v2) -> 
---                 if f == 0 
---                 then v1 `myop` v2
---                 else v2
---                ) (head arr) $ zip flags arr
-
 permute :: [Int] -> [a] -> [a]
 permute indices arr =
     snd . unzip . sortBy (compare `on` fst) $ zip indices arr
@@ -85,3 +76,20 @@ write indices elements arr =
       replaceWith y x = if (fst y) == (fst x)
                         then y -- Indices matched, so replace
                         else x -- Keep original
+
+-- Create a list with [0,...,1,...,0] of length m where the 1 is in
+-- the k'th position.
+createColumn :: Int -> Int -> [Int]
+createColumn m k =
+    map (\position -> if position == k
+                      then 1
+                      else 0) $ iota m
+
+-- Another way of doing it.
+createColumn2 :: Int -> Int -> [Int]
+createColumn2 m k =
+    let
+        zeros = replicate m 0
+        (ys,_:zs) = splitAt k zeros
+    in
+      ys ++ (1 : zs)

@@ -7,10 +7,8 @@ import Helpers
 import Data.List(zip5)
 
 -- Up to four equivalence classes (not generalized).
-mdiscr4 :: (a -> Int) -> [a] -> ([a], [Int])
-mdiscr4 discr arr = (permute inds arr, flags)
--- mdiscr4 :: (a -> Int) -> [a] -> ([Int], [Int])
--- mdiscr4 discr arr = (inds, flags)
+mdiscr4 :: (a -> Int) -> [a] -> ([Int], [a])
+mdiscr4 discr arr = (flags, permute inds arr)
     where
       n        = length arr
       ds       = map discr arr
