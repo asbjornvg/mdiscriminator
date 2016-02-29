@@ -77,8 +77,8 @@ public:
 template<class DISCR>
 __global__ void
 mapCondKernel(   typename DISCR::InType*    d_in,
-                 int*                      d_out,
-                 unsigned int              d_size
+                 int*                       d_out,
+                 unsigned int               d_size
     ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     if(gid < d_size) {
@@ -92,9 +92,9 @@ mapCondKernel(   typename DISCR::InType*    d_in,
 */
 template<class DISCR>
 __global__ void
-mapTupleKernel(  int*                       d_in,
+mapTupleKernel(  int*                        d_in,
                  typename DISCR::TupleType*  d_out,
-                 unsigned int               d_size
+                 unsigned int                d_size
     ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     if(gid < d_size) {
@@ -112,11 +112,11 @@ mapTupleKernel(  int*                       d_in,
 */
 template<class DISCR>
 __global__ void
-zipWithKernel(  int*                       d_classes,
+zipWithKernel(  int*                        d_classes,
                 typename DISCR::TupleType*  d_scan_results,
                 typename DISCR::TupleType   offsets,
-                int*                       d_out,
-                unsigned int               d_size
+                int*                        d_out,
+                unsigned int                d_size
     ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     if(gid < d_size) {
@@ -141,7 +141,8 @@ __global__ void
 permuteKernel(  T*            d_in,
                 int*          indices,
                 T*            d_out,
-                unsigned int  d_size) {
+                unsigned int  d_size
+    ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     // if ( gid < d_size ) {
     //     int prev = (gid > 0) ? indices[gid-1] : 0;

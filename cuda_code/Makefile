@@ -1,8 +1,11 @@
 MdiscrTest: MdiscrTest.cu
 	nvcc -O3 -arch=sm_20 -o $@ $<
 
+CoalescedTest: CoalescedTest.cu
+	nvcc -O3 -arch=sm_20 -o $@ $<
+
 clean:
-	rm MdiscrTest
+	rm -f MdiscrTest CoalescedTest
 
 
 # For synchronizing between my computer and the gpu01 machine.
