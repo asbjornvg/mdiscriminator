@@ -5,8 +5,6 @@
 #include "HelpersHost.cu.h"
 //#include <thrust/scan.h>
 
-#define MAX_BLOCKS 65535
-
 /**
  * num_elems     The size of both the input and output array.
  * d_in          The device input array. It is supposably allocated and holds
