@@ -9,13 +9,13 @@
  */
 template<class DISCR>
 __global__ void
-mapCondKernel(   typename DISCR::InType*    d_in,
-                 int*                       d_out,
-                 unsigned int               d_size
+discrKernel(   typename DISCR::InType*    in_array,
+               int*                       classes, //d_out
+               unsigned int               d_size
     ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     if(gid < d_size) {
-        d_out[gid] = DISCR::apply(d_in[gid]);
+        classes[gid] = DISCR::apply(in_array[gid]);
     }
 }
 
@@ -23,45 +23,44 @@ mapCondKernel(   typename DISCR::InType*    d_in,
  * Kernel that turns all the elements into tuples. An element with value k
  * is turned into a tuple of all zeros with a 1 in the k'th position.
 */
-template<class DISCR>
+template<class TUPLETYPE>
 __global__ void
-mapTupleKernel(  int*                        d_in,
-                 typename DISCR::TupleType*  d_out,
-                 unsigned int                d_size
+tupleKernel(  int*          classes,
+              TUPLETYPE*    columns, //d_out
+              unsigned int  d_size
     ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     if(gid < d_size) {
         // New tuple of zeros.
-        typename DISCR::TupleType tuple;
+        TUPLETYPE tuple;
         // Set the entry to 1 that corresponds to the class.
-        tuple[d_in[gid]] = 1;
-        d_out[gid] = tuple;
+        tuple[classes[gid]] = 1;
+        columns[gid] = tuple;
     }
 }
 
 /*
- * Kernel that extracts the appropriate entry from the scanned columns and adds
- * the corresponding offset.
+ * Kernel that computes indices based on the scan results and offsets.
 */
-template<class DISCR>
+template<class TUPLETYPE>
 __global__ void
-zipWithKernel(  int*                        d_classes,
-                typename DISCR::TupleType*  d_scan_results,
-                typename DISCR::TupleType   offsets,
-                int*                        d_out,
-                unsigned int                d_size
+indicesKernel(  int*          classes,
+                TUPLETYPE*    scan_results,
+                TUPLETYPE     offsets,
+                int*          indices, //d_out
+                unsigned int  d_size
     ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     if(gid < d_size) {
         // The current entries.
-        int k = d_classes[gid];
-        typename DISCR::TupleType scan_result = d_scan_results[gid];
+        int k = classes[gid];
+        TUPLETYPE scan_result = scan_results[gid];
         
         // Select the k'th entries.
         int scan_result_k = scan_result[k];
         int offset_k = offsets[k];
         // Add offset. Subtract 1 to make it 0-indexed.
-        d_out[gid] = scan_result_k + offset_k - 1;
+        indices[gid] = scan_result_k + offset_k - 1;
     }
 }
 
@@ -71,20 +70,37 @@ zipWithKernel(  int*                        d_classes,
 */
 template<class T>
 __global__ void
-permuteKernel(  T*            d_in,
+permuteKernel(  T*            in_array,
                 int*          indices,
-                T*            d_out,
+                T*            out_array, //d_out
                 unsigned int  d_size
     ) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
-    // if ( gid < d_size ) {
-    //     int prev = (gid > 0) ? indices[gid-1] : 0;
-    //     int curr = indices[gid];
-    //     if(prev != curr) d_out[curr-1] = d_in[gid];
-    // }
     if ( gid < d_size ) {
         int index = indices[gid];
-        d_out[index] = d_in[gid];
+        out_array[index] = in_array[gid];
+    }
+}
+
+/*
+ * Kernel that writes a sizes-array (flag-array), placing the given reduction
+ * at the given offsets, and putting zeros at all the other places. Both the
+ * offsets and the reduction are tuples of the same size.
+ */
+template<class TUPLETYPE>
+__global__ void
+sizesKernel(TUPLETYPE     offsets,
+            TUPLETYPE     reduction,
+            int*          sizes, //d_out
+            unsigned int  d_size
+    ) {
+    const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
+    if(gid < d_size) {
+        if (gid < TUPLETYPE::cardinal) {
+            int index = offsets[gid];
+            int size = reduction[gid];
+            sizes[index] = size;
+        }
     }
 }
 

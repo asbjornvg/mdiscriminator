@@ -1,11 +1,23 @@
 MdiscrTest: MdiscrTest.cu
 	nvcc -O3 -arch=sm_20 -o $@ $<
 
+MdiscrTestThrust: MdiscrTest.cu
+	nvcc -O3 -arch=sm_20 -DTHRUST -o $@ $<
+
+MdiscrSegmTest: MdiscrSegmTest.cu
+	nvcc -O3 -arch=sm_20 -o $@ $<
+
 CoalescedTest: CoalescedTest.cu
 	nvcc -O3 -arch=sm_20 -o $@ $<
 
+ThrustTest: ThrustTest.cu
+	nvcc -O3 -arch=sm_20 -o $@ $<
+
+ThrustTestDebug: ThrustTest.cu
+	nvcc -g -G -arch=sm_20 -o $@ $<
+
 clean:
-	rm -f MdiscrTest CoalescedTest
+	rm -f MdiscrTest MdiscrTestThrust MdiscrSegmTest CoalescedTest ThrustTest ThrustTestDebug
 
 
 # For synchronizing between my computer and the gpu01 machine.
