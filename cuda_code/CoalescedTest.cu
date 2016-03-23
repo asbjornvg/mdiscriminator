@@ -83,12 +83,8 @@ int main(int argc, char** argv) {
     }
     
     // Sizes for the kernels.
-    unsigned int block_size, num_blocks;
-    
-    // Compute the sizes for the kernels.
-    block_size = nextMultOf( (num_elems + MAX_BLOCKS - 1) / MAX_BLOCKS, 32 );
-    block_size = (block_size < 256) ? 256 : block_size;
-    num_blocks = (num_elems + block_size - 1) / block_size;
+    unsigned int block_size = getBlockSize(num_elems);
+    unsigned int num_blocks = getNumBlocks(num_elems, block_size);
     
     // Call the kernels.
     gettimeofday(&t_start_coalesced, NULL);

@@ -7,6 +7,15 @@ MdiscrTestThrust: MdiscrTest.cu
 MdiscrSegmTest: MdiscrSegmTest.cu
 	nvcc -O3 -arch=sm_20 -o $@ $<
 
+MdiscrSegmTestThrust: MdiscrSegmTest.cu
+	nvcc -O3 -arch=sm_20 -DTHRUST -o $@ $<
+
+SeqMdiscrTest: SeqMdiscrTest.cpp
+	g++ -O3 -o $@ $<
+
+OpenmpMdiscrTest: OpenmpMdiscrTest.cpp
+	g++ -fopenmp -O3 -o $@ $<
+
 CoalescedTest: CoalescedTest.cu
 	nvcc -O3 -arch=sm_20 -o $@ $<
 
@@ -17,7 +26,7 @@ ThrustTestDebug: ThrustTest.cu
 	nvcc -g -G -arch=sm_20 -o $@ $<
 
 clean:
-	rm -f MdiscrTest MdiscrTestThrust MdiscrSegmTest CoalescedTest ThrustTest ThrustTestDebug
+	rm -f MdiscrTest MdiscrTestThrust MdiscrSegmTest MdiscrSegmTestThrust SeqMdiscrTest CoalescedTest ThrustTest ThrustTestDebug
 
 
 # For synchronizing between my computer and the gpu01 machine.

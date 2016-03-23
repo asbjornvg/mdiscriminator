@@ -83,19 +83,6 @@ indicesKernelSegm(int*          classes,
     }
 }
 
-// /*
-//  * 
-//  */
-// __global__ void
-// onesKernel(int*          ones, //d_out
-//            unsigned int  d_size
-//     ) {
-//     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
-//     if(gid < d_size) {
-//         ones[gid] = 1;
-//     }
-// }
-
 /*
  * 
  */

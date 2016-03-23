@@ -22,9 +22,9 @@
  */
 template<class DISCR>
 void mdiscr( const unsigned int       num_elems,
-             typename DISCR::InType*  in_array,  // device
-             typename DISCR::InType*  out_array, // device
-             int*                     sizes      // device
+             typename DISCR::InType*  in_array,   // device
+             typename DISCR::InType*  out_array,  // device
+             int*                     sizes_array // device
     ) {
     
     // Time measurement data structures.
@@ -33,17 +33,13 @@ void mdiscr( const unsigned int       num_elems,
     unsigned long int elapsed;
     
     // Sizes for the kernels.
-    unsigned int block_size, num_blocks;
+    unsigned int block_size = getBlockSize(num_elems);
+    unsigned int num_blocks = getNumBlocks(num_elems, block_size);
     
     // Intermediate result data structures.
     typename DISCR::TupleType reduction, offsets;
     int *classes, *indices;
     typename DISCR::TupleType *columns, *scan_results;
-    
-    // Compute the sizes for the kernels.
-    block_size = nextMultOf( (num_elems + MAX_BLOCKS - 1) / MAX_BLOCKS, 32 );
-    block_size = (block_size < 256) ? 256 : block_size;
-    num_blocks = (num_elems + block_size - 1) / block_size;
     
     // Allocate memory for the intermediate results.
     cudaMalloc((void**)&classes, num_elems*sizeof(int));
@@ -66,10 +62,8 @@ void mdiscr( const unsigned int       num_elems,
     
     // Scan the columns.
 #ifdef THRUST
-    printf("Using Thrust scan.\n");
     thrust::inclusive_scan(thrust::device, columns, columns + num_elems, scan_results);
 #else
-    printf("Using custom scan.\n");
     scanInc<Add<typename DISCR::TupleType>,typename DISCR::TupleType>
         (block_size, num_elems, columns, scan_results);
 #endif
@@ -84,7 +78,7 @@ void mdiscr( const unsigned int       num_elems,
     
     // "Exclusive scan" of the reduction tuple to produce the offsets.
     unsigned int tmp = 0;
-    for(int k = 0; k < DISCR::TupleType::cardinal; k++) {
+    for(unsigned int k = 0; k < DISCR::TupleType::cardinal; k++) {
         offsets[k] = tmp;
         tmp += reduction[k];
     }
@@ -103,11 +97,11 @@ void mdiscr( const unsigned int       num_elems,
     gettimeofday(&t_med5, NULL);
     
     // Set all sizes to zero.
-    cudaMemset(sizes, 0, num_elems * sizeof(int));
+    cudaMemset(sizes_array, 0, num_elems * sizeof(int));
     
     
     sizesKernel<typename DISCR::TupleType><<<num_blocks, block_size>>>
-        (offsets, reduction, sizes, num_elems);
+        (offsets, reduction, sizes_array, num_elems);
     cudaThreadSynchronize();
     gettimeofday(&t_end, NULL);
     

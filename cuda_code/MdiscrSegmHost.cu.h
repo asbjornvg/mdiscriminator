@@ -5,7 +5,21 @@
 #include "MdiscrSegmKernels.cu.h"
 #include "HelpersHost.cu.h"
 
+#include <thrust/scan.h>
+#include <thrust/execution_policy.h>
+#include <thrust/device_ptr.h>
 #include <stdio.h>
+
+/*
+ * This is a binary predicate that takes two segment flags/sizes and returns
+ * true if the two flags belong to the same segment.
+ */
+class SecondIsZero {
+public:
+    __device__ __host__ bool operator() (const int f1, const int f2) {
+        return (f2 == 0);
+    }
+};
 
 /**
  * num_elems     The size of both the input and output array.
@@ -22,9 +36,9 @@
 template<class DISCR>
 void mdiscrSegm( const unsigned int       num_elems,
                  typename DISCR::InType*  in_array,      // device
-                 int*            segment_sizes, // device
+                 int*                     segment_sizes, // device
                  typename DISCR::InType*  out_array,     // device
-                 int*            new_sizes      // device
+                 int*                     new_sizes      // device
     ) {
     
     // Time measurement data structures.
@@ -33,18 +47,14 @@ void mdiscrSegm( const unsigned int       num_elems,
     unsigned long int elapsed;
     
     // Sizes for the kernels.
-    unsigned int block_size, num_blocks;
+    unsigned int block_size = getBlockSize(num_elems);
+    unsigned int num_blocks = getNumBlocks(num_elems, block_size);
     
     // Intermediate result data structures.
     int *sizes_extended, *sizes_accumulated, *segment_offsets,
         *classes, *indices;
     typename DISCR::TupleType *columns, *scan_results, *reductions,
         *class_offsets;
-    
-    // Compute the sizes for the kernels.
-    block_size = nextMultOf( (num_elems + MAX_BLOCKS - 1) / MAX_BLOCKS, 32 );
-    block_size = (block_size < 256) ? 256 : block_size;
-    num_blocks = (num_elems + block_size - 1) / block_size;
     
     // Allocate memory for the intermediate results.
     cudaMalloc((void**)&sizes_extended,      num_elems*sizeof(int));
@@ -58,13 +68,26 @@ void mdiscrSegm( const unsigned int       num_elems,
     cudaMalloc((void**)&class_offsets,       num_elems*sizeof(typename DISCR::TupleType));
     
     gettimeofday(&t_start, NULL);
+#ifdef THRUST
+    thrust::inclusive_scan_by_key(thrust::device,
+                                  thrust::device_pointer_cast(segment_sizes),
+                                  thrust::device_pointer_cast(segment_sizes + num_elems),
+                                  thrust::device_pointer_cast(segment_sizes),
+                                  thrust::device_pointer_cast(sizes_extended),
+                                  SecondIsZero());
+#else
     sgmScanInc<Add<int>,int>
         (block_size, num_elems, segment_sizes, segment_sizes, sizes_extended);
+#endif
     cudaThreadSynchronize();
     gettimeofday(&t_med1, NULL);
     
+#ifdef THRUST
+    thrust::inclusive_scan(thrust::device, segment_sizes, segment_sizes + num_elems, sizes_accumulated);
+#else
     scanInc<Add<int>,int>
         (block_size, num_elems, segment_sizes, sizes_accumulated);
+#endif
     cudaThreadSynchronize();
     gettimeofday(&t_med2, NULL);
     
@@ -86,8 +109,17 @@ void mdiscrSegm( const unsigned int       num_elems,
     gettimeofday(&t_med5, NULL);
     
     // Scan the columns (segmented scan).
+#ifdef THRUST
+    thrust::inclusive_scan_by_key(thrust::device,
+                                  thrust::device_pointer_cast(segment_sizes),
+                                  thrust::device_pointer_cast(segment_sizes + num_elems),
+                                  thrust::device_pointer_cast(columns),
+                                  thrust::device_pointer_cast(scan_results),
+                                  SecondIsZero());
+#else
     sgmScanInc<Add<typename DISCR::TupleType>,typename DISCR::TupleType>
         (block_size, num_elems, columns, segment_sizes, scan_results);
+#endif
     cudaThreadSynchronize();
     gettimeofday(&t_med6, NULL);
     

@@ -1,35 +1,20 @@
 #ifndef HELPERS_HOST
 #define HELPERS_HOST
 
+#include "HelpersCommon.h"
 #include "HelpersKernels.cu.h"
+//#include "SeqMdiscr.h"
 
 #include <stdio.h>
 #include <string>
-#include <sys/time.h>
-#include <time.h>
 #include <cassert>
-
-// The maximum number of blocks in one dimension.
-#define MAX_BLOCKS 65535
-
-#define ONE 1
-#define TWO 2
-#define THREE 3
-#define FOUR 4
-#define FIVE 5
-#define SIX 6
-#define SEVEN 7
-#define EIGHT 8
 
 template<class T>
 class Add {
 public:
     typedef T BaseType;
     static __device__ __host__ inline T identity() {
-        //return T::identity_addition();
-        // Here, the assumption is that default-constructed objects correspond
-        // to identity/neutral elements.
-        return T();
+        return T(0);
     }
     static __device__ __host__ inline T apply(const T t1, const T t2) {
         return t1 + t2;
@@ -44,6 +29,9 @@ public:
     __device__ __host__ inline MyInt4() {
         x = 0; y = 0; z = 0; w = 0;
     }
+    __device__ __host__ inline MyInt4(int init) {
+        x = init; y = init; z = init; w = init;
+    }
     __device__ __host__ inline MyInt4(const int& a, const int& b, const int& c, const int& d) {
         x = a; y = b; z = c; w = d;
     }
@@ -54,6 +42,10 @@ public:
         x = i4.x; y = i4.y; z = i4.z; w = i4.w;
     }
     volatile __device__ __host__ inline MyInt4& operator=(const MyInt4& i4) volatile {
+        x = i4.x; y = i4.y; z = i4.z; w = i4.w;
+        return *this;
+    }
+    __device__ __host__ inline MyInt4& operator=(const MyInt4& i4) {
         x = i4.x; y = i4.y; z = i4.z; w = i4.w;
         return *this;
     }
@@ -100,21 +92,29 @@ public:
             arr[i] = 0;
         }
     }
+    __device__ __host__ inline MyInt(int init) {
+        for (int i = 0; i < N; i++) {
+            arr[i] = init;
+        }
+    }
     __device__ __host__ inline MyInt(const MyInt<N>& other) {
         for (int i = 0; i < N; i++) {
-            //arr[i] = other[i];
             arr[i] = other.arr[i];
         }
     }
     __device__ __host__ inline MyInt(const volatile MyInt<N>& other) {
         for (int i = 0; i < N; i++) {
-            //arr[i] = other[i];
             arr[i] = other.arr[i];
         }
     }
     volatile __device__ __host__ inline MyInt<N>& operator=(const MyInt<N>& other) volatile {
         for (int i = 0; i < N; i++) {
-            //arr[i] = other[i];
+            arr[i] = other.arr[i];
+        }
+        return *this;
+    }
+    __device__ __host__ inline MyInt<N>& operator=(const MyInt<N>& other) {
+        for (int i = 0; i < N; i++) {
             arr[i] = other.arr[i];
         }
         return *this;
@@ -122,7 +122,6 @@ public:
     __device__ __host__ friend MyInt<N> operator+(const MyInt<N> &m1, const MyInt<N> &m2) {
         MyInt<N> m;
         for (int i = 0; i < N; i++) {
-            //m[i] = m1[i] + m2[i];
             m.arr[i] = m1.arr[i] + m2.arr[i];
         }
         return m;
@@ -148,99 +147,61 @@ public:
     }
 };
 
-template<class ModN>
-bool validateOneSegment(typename ModN::InType*  h_in,
-                        typename ModN::InType*  h_out,
-                        int*                    h_out_sizes,
-                        unsigned int            num_elems
-    ) {
+// template<class ModN>
+// bool validateOneSegment(typename ModN::InType*  in_array,
+//                         typename ModN::InType*  out_array,
+//                         int*                    sizes_array,
+//                         unsigned int            num_elems
+//     ) {
     
-    bool success = true;
-    unsigned int i, k, size;
+//     bool success = true;
     
-    // Extract the actual sizes (non-zero elements) from the sizes array.
-    typename ModN::TupleType sizes;
-    i = 0;
-    while (i < num_elems) {
-        size = h_out_sizes[i];
-        if (size != 0) {
-            sizes[ModN::apply(h_out[i])] = size;
-        }
-        i++;
-    }
+//     // Allocate memory for the comparison (sequential) run.
+//     typename ModN::InType* in_array_cmp =
+//         (typename ModN::InType*) malloc(num_elems * sizeof(typename ModN::InType));
+//     typename ModN::InType* out_array_cmp =
+//         (typename ModN::InType*) malloc(num_elems * sizeof(typename ModN::InType));
+//     int* sizes_array_cmp = (int*) malloc(num_elems * sizeof(int));
     
-    // Count the sizes of the equivalence classes sequentially.
-    typename ModN::TupleType sizes_cmp;
-    for(i = 0; i < num_elems; i++) {
-        // Increment the size of the corresponding equivalence class.
-        sizes_cmp[ModN::apply(h_in[i])]++;
-    }
+//     // Copy the in-array.
+//     memcpy(in_array_cmp, in_array, num_elems*sizeof(typename ModN::InType));
     
-    // The sizes must match.
-    for(k = 0; k < ModN::TupleType::cardinal; k++) {
-        if ( sizes[k] != sizes_cmp[k] ) {
-            success = false;
-            printf("Invalid size #%d, computed: %d, should be: %d!!! EXITING!\n\n", k, sizes[k], sizes_cmp[k]);
-        }
-    }
+//     // Run the sequential version.
+//     seqMdiscr<ModN, false>(num_elems, in_array_cmp, out_array_cmp, sizes_array_cmp);
     
-    if (success) {
-        // "Exclusive scan" of the sizes tuple to produce the starting point offsets
-        // for each equivalence class.
-        unsigned int tmp = 0;
-        typename ModN::TupleType offsets;
-        for(int k = 0; k < ModN::TupleType::cardinal; k++) {
-            offsets[k] = tmp;
-            tmp += sizes[k];
-        }
-    
-        // The "current" offsets into each equivalence class.
-        typename ModN::TupleType count;
+//     typename ModN::InType out_element, out_element_cmp;
+//     int size, size_cmp;
+//     for(unsigned int i = 0; i < num_elems; i++) {
         
-        for(i = 0; i < num_elems; i++) {
-            int in_el = h_in[i];
-            int eq_class = ModN::apply(in_el);
-            int out_el = h_out[count[eq_class] + offsets[eq_class]];
-            if (out_el != in_el) {
-                success = false;
-                printf("Violation: %d should be %d (eq_class = %d, i = %d)\n", out_el, in_el, eq_class, i);
-                if(i > 9) break;
-            }
-            count[eq_class]++;
-        }
-    }
+//         // Compare elements.
+//         out_element = out_array[i];
+//         out_element_cmp = out_array_cmp[i];
+//         if (out_element != out_element_cmp) {
+//             success = false;
+//             printf("Violation: %d should be %d (i = %d)\n", out_element, out_element_cmp, i);
+//         }
+        
+//         // Compare sizes.
+//         size = sizes_array[i];
+//         size_cmp = sizes_array_cmp[i];
+//         if (size != size_cmp) {
+//             success = false;
+//             printf("Invalid size: %d should be %d (i = %d)\n", size, size_cmp, i);
+//         }
+        
+//         // Only print the first few violations.
+//         if (!success && i > 9) {
+//             break;
+//         }
+//     }
     
-    return success;
-}
-
-void printIntArray(unsigned int length, std::string title, int *arr) {
-    printf("%-12s [", (title + ":").c_str());
-    bool first = true;
-    for(unsigned int i = 0; i < length; i++) {
-        if (first) {
-            printf("%2d", arr[i]);
-            first = false;
-        }
-        else {
-            printf(", %2d", arr[i]);
-        }
-    }
-    printf("]\n");
-}
-
-int nextMultOf(unsigned int x, unsigned int m) {
-    if( x % m ) return x - (x % m) + m;
-    else        return x;
-}
-
-int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1)
-{
-    unsigned int resolution=1000000;
-    long int diff = (t2->tv_usec + resolution * t2->tv_sec) - (t1->tv_usec + resolution * t1->tv_sec);
-    result->tv_sec = diff / resolution;
-    result->tv_usec = diff % resolution;
-    return (diff<0);
-}
+//     // Free memory.
+//     free(in_array_cmp);
+//     free(out_array_cmp);
+//     free(sizes_array_cmp);
+    
+//     return success;
+// }
 
 /**
  * block_size is the size of the cuda block (must be a multiple 

@@ -1,13 +1,9 @@
 #include "MdiscrSegmHost.cu.h"
 #include "HelpersHost.cu.h"
+#include "MainCommon.h"
 
 #include <stdio.h>
 #include <cassert>
-
-int getNextSegmentSize() {
-    return (std::rand() % 50) + 25;
-    //return (std::rand() % 5) + 3;
-}
 
 template<class ModN>
 bool validate(typename ModN::InType*  h_in,
@@ -45,7 +41,7 @@ bool validate(typename ModN::InType*  h_in,
 }
 
 template<class ModN>
-int testMdiscrSegm(const unsigned int num_elems
+void test(const unsigned int num_elems
     ) {
     
     // Allocate memory.
@@ -59,47 +55,13 @@ int testMdiscrSegm(const unsigned int num_elems
     { // Initialize array.
         
         // Seed the random number generator.
-        //std::srand(33);
         std::srand(time(NULL));
         
-        // Size of the first segment.
-        int current_size = getNextSegmentSize();
-        if (current_size > num_elems) {
-            current_size = num_elems;
-        }
-        
-        // How far into the current segment are we?
-        unsigned int j = 0;
-        
-        for(unsigned int i = 0; i < num_elems; i++) {
-            // New random element.
-            h_in[i] = std::rand() % 20;
-            
-            if (j == 0) {
-                // If we are at the segment start, write the size.
-                h_in_sizes[i] = current_size;
-            }
-            else {
-                // Otherwise, write a zero.
-                h_in_sizes[i] = 0;
-            }
-            
-            if (j == (current_size-1)) {
-                // If we are at the last element of a segment, pick at new
-                // size for the next segment.
-                current_size = getNextSegmentSize();
-                if (current_size > (num_elems-(i+1))) {
-                    current_size = num_elems-(i+1);
-                }
-                j = 0;
-            }
-            else {
-                j++;
-            }
-        }
+        populateIntArray(num_elems, h_in);
+        populateSizesArray(num_elems, h_in_sizes);
     }
-    /* printIntArray(num_elems, "h_in", h_in); */
-    /* printIntArray(num_elems, "h_in_sizes", h_in_sizes); */
+    //printIntArray(num_elems, "h_in", h_in);
+    //printIntArray(num_elems, "h_in_sizes", h_in_sizes);
     
     typename ModN::InType *d_in, *d_out;
     int *d_in_sizes, *d_out_sizes;
@@ -131,8 +93,8 @@ int testMdiscrSegm(const unsigned int num_elems
     cudaFree(d_in_sizes);
     cudaFree(d_out_sizes);
     
-    /* printIntArray(num_elems, "h_out", h_out); */
-    /* printIntArray(num_elems, "h_out_sizes", h_out_sizes); */
+    //printIntArray(num_elems, "h_out", h_out);
+    //printIntArray(num_elems, "h_out_sizes", h_out_sizes);
     
     bool success = validate<ModN>(h_in, h_in_sizes, h_out, h_out_sizes, num_elems);
     
@@ -148,63 +110,4 @@ int testMdiscrSegm(const unsigned int num_elems
     free(h_out);
     free(h_in_sizes);
     free(h_out_sizes);
-
-    return success;
-    
-}
-
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        printf("The program takes <num_elems> as argument!\n");
-        return EXIT_FAILURE;
-    }
-    
-    const unsigned int num_elems = strtoul(argv[1], NULL, 10);
-    
-    if (argc == 2) {
-        printf("Mod4:\n");
-        testMdiscrSegm<Mod4>(num_elems);
-    }
-    else {
-        int num = strtol(argv[2], NULL, 10);
-        switch (num) {
-        case 1 :
-            printf("Mod<ONE>:\n");
-            testMdiscrSegm< Mod<ONE> >(num_elems);
-            break;
-        case 2 :
-            printf("Mod<TWO>:\n");
-            testMdiscrSegm< Mod<TWO> >(num_elems);
-            break;
-        case 3 :
-            printf("Mod<THREE>:\n");
-            testMdiscrSegm< Mod<THREE> >(num_elems);
-            break;
-        case 4 :
-            printf("Mod<FOUR>:\n");
-            testMdiscrSegm< Mod<FOUR> >(num_elems);
-            break;
-        case 5 :
-            printf("Mod<FIVE>:\n");
-            testMdiscrSegm< Mod<FIVE> >(num_elems);
-            break;
-        case 6 :
-            printf("Mod<SIX>:\n");
-            testMdiscrSegm< Mod<SIX> >(num_elems);
-            break;
-        case 7 :
-            printf("Mod<SEVEN>:\n");
-            testMdiscrSegm< Mod<SEVEN> >(num_elems);
-            break;
-        case 8 :
-            printf("Mod<EIGHT>:\n");
-            testMdiscrSegm< Mod<EIGHT> >(num_elems);
-            break;
-        default :
-            printf("Unsupported modulo operation.\n");
-            return EXIT_FAILURE;
-        }
-    }
-    
-    return EXIT_SUCCESS;
 }

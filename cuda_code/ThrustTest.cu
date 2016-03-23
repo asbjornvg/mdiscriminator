@@ -49,14 +49,12 @@ int main(int argc, char** argv) {
     }
     
     // Kernels etc.
-    unsigned int block_size, num_blocks;
+    unsigned int block_size = getBlockSize(num_elems);
+    unsigned int num_blocks = getNumBlocks(num_elems, block_size);
+    
     int *classes, *indices;
     typename DISCR::TupleType *columns, *scan_results;
     typename DISCR::TupleType reduction, offsets;
-    
-    block_size = nextMultOf( (num_elems + MAX_BLOCKS - 1) / MAX_BLOCKS, 32 );
-    block_size = (block_size < 256) ? 256 : block_size;
-    num_blocks = (num_elems + block_size - 1) / block_size;
     
     // Allocate memory for the intermediate results.
     cudaMalloc((void**)&classes, num_elems*sizeof(int));
