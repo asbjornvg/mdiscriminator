@@ -9,6 +9,16 @@
 #include <string>
 #include <cassert>
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+       fprintf(stderr,"GPUassert (%d): %s (%s, line %d)\n", code, cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 template<class T>
 class Add {
 public:
@@ -226,7 +236,7 @@ void scanInc(    unsigned int  block_size,
                  T*            d_out  // device
 ) {
     unsigned int num_blocks;
-    unsigned int sh_mem_size = block_size * 32; //sizeof(T);
+    unsigned int sh_mem_size = block_size * sizeof(T);
 
     num_blocks = ( (d_size % block_size) == 0) ?
                     d_size / block_size     :
@@ -294,7 +304,7 @@ void sgmScanInc( const unsigned int  block_size,
                  T*            d_out  //device
 ) {
     unsigned int num_blocks;
-    //unsigned int val_sh_size = block_size * sizeof(T  );
+    unsigned int val_sh_size = block_size * sizeof(T  );
     unsigned int flg_sh_size = block_size * sizeof(int);
     
     num_blocks = ( (d_size % block_size) == 0) ?
@@ -306,7 +316,7 @@ void sgmScanInc( const unsigned int  block_size,
     cudaMalloc((void**)&d_rec_in, num_blocks*sizeof(T  ));
     cudaMalloc((void**)&f_rec_in, num_blocks*sizeof(int));
 
-    sgmScanIncKernel<OP,T> <<< num_blocks, block_size, 32*block_size >>>
+    sgmScanIncKernel<OP,T> <<< num_blocks, block_size, val_sh_size+flg_sh_size >>>
                     (d_in, flags, d_out, f_rec_in, d_rec_in, d_size);
     cudaThreadSynchronize();
     //cudaError_t err = cudaThreadSynchronize();

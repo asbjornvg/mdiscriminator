@@ -3,6 +3,7 @@
 #include "MainCommon.h"
 
 #include <stdio.h>
+//#include "cuda_profiler_api.h"
 
 template<class ModN>
 void test(  const unsigned int num_elems
@@ -36,8 +37,12 @@ void test(  const unsigned int num_elems
         cudaThreadSynchronize();
     }
     
+    /* cudaProfilerStart(); */
+    
     // Call the discriminator function.
     mdiscr<ModN>(num_elems, d_in, d_out, d_out_sizes);
+    
+    /* cudaProfilerStop(); */
     
     // Copy result back to host.
     cudaMemcpy(h_out, d_out, num_elems * sizeof(typename ModN::InType), cudaMemcpyDeviceToHost);

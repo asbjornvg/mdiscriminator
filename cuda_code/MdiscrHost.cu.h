@@ -42,22 +42,24 @@ void mdiscr( const unsigned int       num_elems,
     typename DISCR::TupleType *columns, *scan_results;
     
     // Allocate memory for the intermediate results.
-    cudaMalloc((void**)&classes, num_elems*sizeof(int));
-    cudaMalloc((void**)&indices, num_elems*sizeof(int));
-    cudaMalloc((void**)&columns, num_elems*sizeof(typename DISCR::TupleType));
-    cudaMalloc((void**)&scan_results, num_elems*sizeof(typename DISCR::TupleType));
+    gpuErrchk( cudaMalloc((void**)&classes, num_elems*sizeof(int)) );
+    gpuErrchk( cudaMalloc((void**)&indices, num_elems*sizeof(int)) );
+    gpuErrchk( cudaMalloc((void**)&columns, num_elems*sizeof(typename DISCR::TupleType)) );
+    gpuErrchk( cudaMalloc((void**)&scan_results, num_elems*sizeof(typename DISCR::TupleType)) );
     
     // Find the equivalence classes using the discriminator.
     gettimeofday(&t_start, NULL);
     discrKernel<DISCR><<<num_blocks, block_size>>>(in_array, classes, num_elems);
-    cudaThreadSynchronize();
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
     gettimeofday(&t_med1, NULL);
     
     // Turn the elements into tuples of all zeros with a 1 in the k'th position,
     // where k is the class that the elements maps to.
     tupleKernel<typename DISCR::TupleType><<<num_blocks, block_size>>>
         (classes, columns, num_elems);
-    cudaThreadSynchronize();
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
     gettimeofday(&t_med2, NULL);
     
     // Scan the columns.
@@ -66,15 +68,16 @@ void mdiscr( const unsigned int       num_elems,
 #else
     scanInc<Add<typename DISCR::TupleType>,typename DISCR::TupleType>
         (block_size, num_elems, columns, scan_results);
+    gpuErrchk( cudaPeekAtLastError() );
 #endif
-    cudaThreadSynchronize();
+    gpuErrchk( cudaDeviceSynchronize() );
     gettimeofday(&t_med3, NULL);
     
     // Now, the last tuple contains the reduction for each class, i.e., the
     // total number of elements belonging to each class.
     cudaMemcpy(&reduction, &scan_results[num_elems-1],
                sizeof(typename DISCR::TupleType), cudaMemcpyDeviceToHost);
-    cudaThreadSynchronize();
+    //cudaThreadSynchronize();
     
     // "Exclusive scan" of the reduction tuple to produce the offsets.
     unsigned int tmp = 0;
@@ -87,13 +90,15 @@ void mdiscr( const unsigned int       num_elems,
     // corresponding offset.
     indicesKernel<typename DISCR::TupleType><<<num_blocks, block_size>>>
         (classes, scan_results, offsets, indices, num_elems);
-    cudaThreadSynchronize();
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
     gettimeofday(&t_med4, NULL);
     
     // Permute the elements based on the indices.
     permuteKernel<typename DISCR::InType><<<num_blocks, block_size>>>
         (in_array, indices, out_array, num_elems);
-    cudaThreadSynchronize();
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
     gettimeofday(&t_med5, NULL);
     
     // Set all sizes to zero.
@@ -102,7 +107,8 @@ void mdiscr( const unsigned int       num_elems,
     
     sizesKernel<typename DISCR::TupleType><<<num_blocks, block_size>>>
         (offsets, reduction, sizes_array, num_elems);
-    cudaThreadSynchronize();
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
     gettimeofday(&t_end, NULL);
     
     timeval_subtract(&t_diff, &t_end, &t_start);

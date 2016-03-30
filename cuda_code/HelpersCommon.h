@@ -9,6 +9,11 @@
 
 #include "SeqMdiscr.h"
 
+/* #define BEGIN_CATCH_HANDLER try { */
+/* #define END_CATCH_HANDLER } catch(std::exception& e) { \ */
+/*         std::cerr << " error: " << e.what() << \ */
+/*             " (file " << __FILE__ << ", line " << __LINE__ << ")" << std::endl; } */
+
 int nextMultOf(unsigned int x, unsigned int m) {
     if( x % m ) return x - (x % m) + m;
     else        return x;

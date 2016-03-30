@@ -64,6 +64,10 @@ int main(int argc, char** argv) {
             printf("Mod<8>:\n");
             test< Mod<8> >(num_elems);
             break;
+        case 9 :
+            printf("Mod<9>:\n");
+            test< Mod<9> >(num_elems);
+            break;
         default :
             printf("Unsupported number of equivalence classes.\n");
             return EXIT_FAILURE;
