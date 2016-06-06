@@ -62,6 +62,43 @@ scanIncKernel(T* d_in, T* d_out, unsigned int d_size) {
     if (gid < d_size) d_out [gid] = res; 
 }
 
+/*
+ * Generalization of scanIncGen (below) in which padding can occur. So orig_idx
+ * is the index into the non-padded array and is only used to determine the
+ * lane of the calling thread, whereas padd_idx is the actual index into the
+ * array. The padding should only occur between groups of cooperating threads
+ * and never inside a group.
+ */
+template<class OP, class T, unsigned int NUM>
+__device__ inline
+T scanIncGenPad(volatile T* ptr,
+                const unsigned int orig_idx,
+                const unsigned int padded_idx) {
+    
+    const unsigned int lane = orig_idx & (NUM-1);
+    unsigned int lower_bound;
+
+#pragma unroll
+    for (lower_bound = 1; lower_bound < NUM; lower_bound *= 2) {
+        if (lane >= lower_bound) {
+            ptr[padded_idx] = OP::apply(ptr[padded_idx-lower_bound],  ptr[padded_idx]);
+        }
+    }
+    
+    return const_cast<T&>(ptr[padded_idx]);
+}
+
+/*
+ * Generalization of scanIncWarp so that the number of cooperating threads
+ * doesn't need to be 32 (warp) but can be any power of 2 less than or equal to
+ * 32, given by the template parameter NUM.
+ */
+template<class OP, class T, unsigned int NUM>
+__device__ inline
+T scanIncGen(volatile T* ptr, const unsigned int idx) {
+    return scanIncGenPad<OP,T,NUM>(ptr,idx,idx);
+}
+
 
 /***********************************************************/
 /*** Kernels to copy/distribute the end of block results ***/
@@ -69,11 +106,13 @@ scanIncKernel(T* d_in, T* d_out, unsigned int d_size) {
 
 template<class T>
 __global__ void 
-copyEndOfBlockKernel(T* d_in, T* d_out, unsigned int d_out_size) {
+copyEndOfBlockKernel(T* d_in, T* d_out, unsigned int d_out_size, unsigned int d_orig_size) {
     const unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
     
-    if(gid < d_out_size)
-        d_out[gid] = d_in[ blockDim.x*(gid+1) - 1];
+    if(gid < d_out_size) {
+        // d_out[gid] = d_in[ blockDim.x*(gid+1) - 1];
+        d_out[gid] = d_in[ min(blockDim.x*(gid+1), d_orig_size) - 1];
+    }
 }
 
 template<class OP, class T>
@@ -214,5 +253,65 @@ sgmShiftRightByOne(T*            d_in,
         else                     d_out[gid] = d_in[gid-1];
     }
 }
+
+/************************/
+/*** TRANSPOSE Kernel ***/
+/************************/
+// blockDim.y = TILE; blockDim.x = TILE
+// each block transposes a square TILE
+template <class T, int TILE>
+__global__ void matTransposeTiledPadKer(T* A, T* B, int heightA, int widthA, int orig_size, T padel) {
+    
+    __shared__ T tile[TILE][TILE+1];
+    
+    int block_rows = blockDim.y;
+    int x, y, j, ind, yj;
+    
+    x = blockIdx.x * TILE + threadIdx.x;
+    y = blockIdx.y * TILE + threadIdx.y;
+    
+    for (j = 0; j < TILE; j += block_rows) {
+        yj = y + j;
+        ind = yj * widthA + x;
+        if( x < widthA && yj < heightA ) {
+            tile[threadIdx.y + j][threadIdx.x] = (ind < orig_size) ? A[ind] : padel;
+        }
+    }
+    
+    __syncthreads();
+    
+    x = blockIdx.y * TILE + threadIdx.x;
+    y = blockIdx.x * TILE + threadIdx.y;
+    
+    for (j = 0; j < TILE; j += block_rows) {
+        yj = y + j;
+        ind = yj * heightA + x;
+        if( x < heightA && yj < widthA ) {
+            B[ind] = tile[threadIdx.x][threadIdx.y + j];
+        }
+    }
+}
+
+/* template <class T, int TILE> */
+/* __global__ void matTransposeTiledPadKer(T* A, T* B, int heightA, int widthA, int orig_size, T padel) { */
+
+/*   __shared__ T tile[TILE][TILE+1]; */
+
+/*   int x = blockIdx.x * TILE + threadIdx.x; */
+/*   int y = blockIdx.y * TILE + threadIdx.y; */
+
+/*   int ind = y*widthA+x; */
+/*   if( x < widthA && y < heightA ) */
+/*       tile[threadIdx.y][threadIdx.x] = (ind < orig_size) ? A[ind] : padel; */
+
+/*   __syncthreads(); */
+
+/*   x = blockIdx.y * TILE + threadIdx.x; */
+/*   y = blockIdx.x * TILE + threadIdx.y; */
+
+/*   ind = y*heightA + x; */
+/*   if( x < heightA && y < widthA ) */
+/*       B[ind] = tile[threadIdx.x][threadIdx.y]; */
+/* } */
 
 #endif //HELPERS_KERNELS

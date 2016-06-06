@@ -3,11 +3,10 @@
 
 #include "HelpersCommon.h"
 #include "HelpersKernels.cu.h"
-//#include "SeqMdiscr.h"
 
-#include <stdio.h>
-#include <string>
-#include <cassert>
+#include<stdio.h>
+#include<string>
+#include<cassert>
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
@@ -19,199 +18,49 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
-template<class T>
-class Add {
-public:
-    typedef T BaseType;
-    static __device__ __host__ inline T identity() {
-        return T(0);
-    }
-    static __device__ __host__ inline T apply(const T t1, const T t2) {
-        return t1 + t2;
-    }
-};
-
-class MyInt4 {
-public:
-    int x; int y; int z; int w;
-    static const int cardinal = 4;
+/**
+ * d_in       is the device matrix; it is supposably
+ *                allocated and holds valid values (input).
+ *                semantically of size [height x width]
+ * d_out      is the output GPU array -- if you want
+ *            its data on CPU needs to copy it back to host.
+ *                semantically of size [width x height]
+ * height     is the height of the input matrix
+ * width      is the width  of the input matrix
+ */
+template<class T, int TILE>
+void transposePad( T*                  inp_d,
+                   T*                  out_d,
+                   const unsigned int  height,
+                   const unsigned int  width,
+                   const unsigned int  oinp_size,
+                   T                   pad_elem
+    ) {
     
-    __device__ __host__ inline MyInt4() {
-        x = 0; y = 0; z = 0; w = 0;
-    }
-    __device__ __host__ inline MyInt4(int init) {
-        x = init; y = init; z = init; w = init;
-    }
-    __device__ __host__ inline MyInt4(const int& a, const int& b, const int& c, const int& d) {
-        x = a; y = b; z = c; w = d;
-    }
-    __device__ __host__ inline MyInt4(const MyInt4& i4) {
-        x = i4.x; y = i4.y; z = i4.z; w = i4.w;
-    }
-    __device__ __host__ inline MyInt4(const volatile MyInt4& i4) {
-        x = i4.x; y = i4.y; z = i4.z; w = i4.w;
-    }
-    volatile __device__ __host__ inline MyInt4& operator=(const MyInt4& i4) volatile {
-        x = i4.x; y = i4.y; z = i4.z; w = i4.w;
-        return *this;
-    }
-    __device__ __host__ inline MyInt4& operator=(const MyInt4& i4) {
-        x = i4.x; y = i4.y; z = i4.z; w = i4.w;
-        return *this;
-    }
-    __device__ __host__ friend MyInt4 operator+(const MyInt4 &m1, const MyInt4 &m2) {
-        return MyInt4(m1.x+m2.x, m1.y+m2.y, m1.z+m2.z, m1.w+m2.w);
-    }
-    __device__ __host__ int& operator[](const int i) {
-        assert(i >= 0 && i <= 3);
-        if (i == 0) return x;
-        else if (i == 1) return y;
-        else if (i == 2) return z;
-        else return w; // i == 3
-    }
-    __device__ __host__ operator int * () {
-        return reinterpret_cast<int *>(this);
-    }
-    __device__ __host__ inline void set(const volatile MyInt4& i4) {
-        x = i4.x; y = i4.y; z = i4.z; w = i4.w;
-    }
-};
-
-class Mod4 {
-public:
-    typedef int           InType;
-    // The out-type is always int for these discriminators.
-    typedef MyInt4        TupleType;
-    static __host__ __device__ inline int apply(volatile int x) {
-        return x & 3;
-    }
-};
-
-template<int N>
-class MyInt {
-public:
-    int arr[N];
-    static const int cardinal = N;
+    // Number of iterations on the y-axis.
+    int elements_pr_thread = 4;
     
-    __device__ __host__ int& operator[](const int i) {
-        assert(i >= 0 && i < N);
-        return arr[i];
-    }
-    __device__ __host__ inline MyInt() {
-        for (int i = 0; i < N; i++) {
-            arr[i] = 0;
-        }
-    }
-    __device__ __host__ inline MyInt(int init) {
-        for (int i = 0; i < N; i++) {
-            arr[i] = init;
-        }
-    }
-    __device__ __host__ inline MyInt(const MyInt<N>& other) {
-        for (int i = 0; i < N; i++) {
-            arr[i] = other.arr[i];
-        }
-    }
-    __device__ __host__ inline MyInt(const volatile MyInt<N>& other) {
-        for (int i = 0; i < N; i++) {
-            arr[i] = other.arr[i];
-        }
-    }
-    volatile __device__ __host__ inline MyInt<N>& operator=(const MyInt<N>& other) volatile {
-        for (int i = 0; i < N; i++) {
-            arr[i] = other.arr[i];
-        }
-        return *this;
-    }
-    __device__ __host__ inline MyInt<N>& operator=(const MyInt<N>& other) {
-        for (int i = 0; i < N; i++) {
-            arr[i] = other.arr[i];
-        }
-        return *this;
-    }
-    __device__ __host__ friend MyInt<N> operator+(const MyInt<N> &m1, const MyInt<N> &m2) {
-        MyInt<N> m;
-        for (int i = 0; i < N; i++) {
-            m.arr[i] = m1.arr[i] + m2.arr[i];
-        }
-        return m;
-    }
-    __device__ __host__ operator int * () {
-        return reinterpret_cast<int *>(this);
-    }
-    __device__ __host__ inline void set(const volatile MyInt<N>& other) {
-        for (int i = 0; i < N; i++) {
-            arr[i] = other[i];
-        }
-    }
-};
-
-template<int N>
-class Mod {
-public:
-    typedef int           InType;
-    // The out-type is always int for these discriminators.
-    typedef MyInt<N>      TupleType;
-    static __host__ __device__ inline int apply(volatile int x) {
-        return x % N;
-    }
-};
-
-// template<class ModN>
-// bool validateOneSegment(typename ModN::InType*  in_array,
-//                         typename ModN::InType*  out_array,
-//                         int*                    sizes_array,
-//                         unsigned int            num_elems
-//     ) {
+    // The tile dimension must be divisible by elements_pr_thread.
+    assert(TILE % elements_pr_thread == 0);
     
-//     bool success = true;
+    // 1. setup block and grid parameters
     
-//     // Allocate memory for the comparison (sequential) run.
-//     typename ModN::InType* in_array_cmp =
-//         (typename ModN::InType*) malloc(num_elems * sizeof(typename ModN::InType));
-//     typename ModN::InType* out_array_cmp =
-//         (typename ModN::InType*) malloc(num_elems * sizeof(typename ModN::InType));
-//     int* sizes_array_cmp = (int*) malloc(num_elems * sizeof(int));
+    // Instead of one element per thread, each thread works on
+    // elements_pr_thread elements.
+    dim3 block(TILE, TILE/elements_pr_thread, 1);
+    //dim3 block(TILE, TILE, 1);
     
-//     // Copy the in-array.
-//     memcpy(in_array_cmp, in_array, num_elems*sizeof(typename ModN::InType));
+    int dimx = ceil( ((float) width)/TILE );
+    int dimy = ceil( ((float)height)/TILE );
     
-//     // Run the sequential version.
-//     seqMdiscr<ModN, false>(num_elems, in_array_cmp, out_array_cmp, sizes_array_cmp);
+    dim3 grid (dimx, dimy, 1);
     
-//     typename ModN::InType out_element, out_element_cmp;
-//     int size, size_cmp;
-//     for(unsigned int i = 0; i < num_elems; i++) {
-        
-//         // Compare elements.
-//         out_element = out_array[i];
-//         out_element_cmp = out_array_cmp[i];
-//         if (out_element != out_element_cmp) {
-//             success = false;
-//             printf("Violation: %d should be %d (i = %d)\n", out_element, out_element_cmp, i);
-//         }
-        
-//         // Compare sizes.
-//         size = sizes_array[i];
-//         size_cmp = sizes_array_cmp[i];
-//         if (size != size_cmp) {
-//             success = false;
-//             printf("Invalid size: %d should be %d (i = %d)\n", size, size_cmp, i);
-//         }
-        
-//         // Only print the first few violations.
-//         if (!success && i > 9) {
-//             break;
-//         }
-//     }
+    fprintf(stderr, "TILE = %d, TILE/elements_pr_thread = %d, dimy = %d, dimx = %d\n", TILE, TILE/elements_pr_thread, dimy, dimx);
     
-//     // Free memory.
-//     free(in_array_cmp);
-//     free(out_array_cmp);
-//     free(sizes_array_cmp);
-    
-//     return success;
-// }
+    // 2. execute the kernel
+    matTransposeTiledPadKer<T,TILE> <<< grid, block >>>
+        (inp_d, out_d, height, width, oinp_size, pad_elem);
+}
 
 /**
  * block_size is the size of the cuda block (must be a multiple 
@@ -243,7 +92,7 @@ void scanInc(    unsigned int  block_size,
                     d_size / block_size + 1 ;
 
     scanIncKernel<OP,T><<< num_blocks, block_size, sh_mem_size >>>(d_in, d_out, d_size);
-    cudaThreadSynchronize();
+    /* cudaThreadSynchronize(); */
     
     if (block_size >= d_size) { return; }
 
@@ -261,8 +110,8 @@ void scanInc(    unsigned int  block_size,
                                   num_blocks / block_size + 1 ; 
 
     //   2. copy in the end-of-block results of the previous scan 
-    copyEndOfBlockKernel<T><<< num_blocks_rec, block_size >>>(d_out, d_rec_in, num_blocks);
-    cudaThreadSynchronize();
+    copyEndOfBlockKernel<T><<< num_blocks_rec, block_size >>>(d_out, d_rec_in, num_blocks, d_size);
+    /* cudaThreadSynchronize(); */
 
     //   3. scan recursively the last elements of each CUDA block
     scanInc<OP,T>( block_size, num_blocks, d_rec_in, d_rec_out );
@@ -271,7 +120,7 @@ void scanInc(    unsigned int  block_size,
     //      recursively scanned data to all elements of the
     //      corresponding original block
     distributeEndBlock<OP,T><<< num_blocks, block_size >>>(d_rec_out, d_out, d_size);
-    cudaThreadSynchronize();
+    /* cudaThreadSynchronize(); */
 
     //   5. clean up
     cudaFree(d_rec_in );

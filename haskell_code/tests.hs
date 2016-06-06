@@ -2,7 +2,7 @@ import Mdiscr(mdiscr)
 import Mdiscr4(mdiscr4)
 
 arr :: [Int]
-arr = [5,4,2,3,7,8,6,4,1,9,11,12,10]
+arr = [5,4,2,3,7,8,10,4,1,9,11,12,6]
 
 test :: Int -> IO ()
 test m = do
