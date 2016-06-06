@@ -1,1 +1,2 @@
-# mdiscriminator
+# m-discriminator
+This project aims at developing an efficient implementation of m-discriminator on GPGPUs -- an extension of the classical filter operator. The Haskell code is the high-level version of the program, and the CUDA code is my actual implementation.
